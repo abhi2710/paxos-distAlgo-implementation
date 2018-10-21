@@ -1,0 +1,156 @@
+import sys
+import random
+import time
+import orig
+import preemption-copy
+config(channel is fifo, clock is lamport)
+
+class Driver(process):
+    def setup(p,r,n,d,a):  # s is set of all other processes
+        self.results={}
+        self.results2={}
+        self.p=p
+        self.r=r
+        self.n=n
+        self.d=d
+        self.a=a
+        self.timeout=4
+
+    def formatResults(results,type):
+        varyingFunc="nProcesses"
+        if type == "reqs":
+            output("=========================================Fixed processes(n="+str(p)+"), Varying Requests(r)===========================================")
+            varyingFunc="nRequests"
+        else:
+            output("=========================================Varying processes(n), Fixed Requests(r="+str(r)+")===========================================")
+
+        output("************************************************************************************")
+        output("********************************Average CPU Time************************************")
+        output("************************************************************************************")
+        output( "{:<10} | {:<20} | {:<10} | {:<10} ".format(varyingFunc,'orig.da','spec.da', 'q1.da'))
+        for i in results['orig']:
+            output( "{:<10} | {:<20} | {:<10} | {:<10} ".format(i,
+            round(results['orig'][i]['cpuTime']/results['orig'][i]['repetitions'],4) if results['orig'][i]['repetitions'] > 0 else "Failed",
+            round(results['spec'][i]['cpuTime']/results['spec'][i]['repetitions'],4) if results['spec'][i]['repetitions'] > 0 else "Failed",
+            round(results['q1'][i]['cpuTime']/results['q1'][i]['repetitions'],4) if results['q1'][i]['repetitions'] > 0 else "Failed"
+            ))
+        output('\n')
+        output("************************************************************************************")
+        output("********************************Average Elapsed Time********************************")
+        output("************************************************************************************")
+        output( "{:<10} | {:<20} | {:<10} | {:<10} ".format(varyingFunc,'orig.da','spec.da', 'q1.da'))
+        for i in results['orig']:
+            output( "{:<10} | {:<20} | {:<10} | {:<10} ".format(i,
+            round(results['orig'][i]['execTime']/results['orig'][i]['repetitions'],4) if results['orig'][i]['repetitions'] > 0 else "Failed",
+            round(results['spec'][i]['execTime']/results['spec'][i]['repetitions'],4) if results['spec'][i]['repetitions'] > 0 else "Failed",
+            round(results['q1'][i]['execTime']/results['q1'][i]['repetitions'],4) if results['q1'][i]['repetitions'] > 0 else "Failed"
+            ))
+
+
+    def runCorrectnessTests():
+        output("====================================================================================")
+        output("================================CORRECTNESS TEST====================================")
+        output("====================================================================================")
+        op=[]
+        for codePath in codePaths:
+            for run in range(n):
+                totalCount=0
+                p_random=random.randint(1,p)
+                r_random=random.randint(1,r)
+                ps = new(codePath.P, num=p_random)
+                for pr in ps: setup(pr, (ps-{pr}, r_random))
+                start(ps)
+                if await(each(pr in ps, has=received((str(codePath.__name__)+'Done', pr)))):
+                    op.append([run,codePath.__name__,p_random,r_random,"Yes",])
+                elif timeout(self.timeout):
+                    op.append([run,codePath.__name__,p_random,r_random,"No",])
+
+
+                send((str(codePath.__name__)+'Done',), to=ps)
+        output("************************************************************************************")
+        output("********************************CORRECTNESS*****************************************")
+        output("************************************************************************************")
+        output("{:<10} | {:<20}  | {:<10} | {:<10} | {:<10} ".format("Run",'Implementation','nProcesses','nRequests','Is Correct'))
+        for i in op:
+            output( "{:<10} | {:<20}  | {:<10} | {:<10} | {:<10} ".format(i[0],i[1],i[2],i[3],i[4]))
+
+
+    def runPerformanceTests():
+        output("====================================================================================")
+        output("=============================STARTING PERFORMANCE TEST===============================")
+        output("================================Varying Requests====================================")
+        for codePath in codePaths:
+            c=codePath.__name__
+            results[c]={}
+            for run in range(1,d+1):
+                rRandom=int(run*(n/d))
+                results[c][rRandom]={"execTime":0,"cpuTime":0,"repetitions":0}
+                for repetition in range(a):
+                    ps = new(codePath.P, num=p)
+                    for pr in ps: setup(pr, (ps-{pr}, rRandom))
+                    startTime=time.time()
+                    startCPUTime=time.process_time()
+                    start(ps)
+                    if await(each(pr in ps, has=received((str(codePath.__name__)+'Done', pr)))):
+                        results[c][rRandom]["repetitions"]+=1
+                        results[c][rRandom]["execTime"]+= (time.time() - startTime)
+                        results[c][rRandom]["cpuTime"]+= (time.process_time() - startCPUTime)
+                    elif timeout(self.timeout):
+                        pass
+                    send((str(codePath.__name__)+'Done',), to=ps)
+
+        formatResults(results,"reqs")
+
+    def runPerformanceTests2():
+        output('\n')
+        output('\n')
+        output("====================================================================================")
+        output("================================PERFORMANCE TEST2====================================")
+        output("================================Varying Processes====================================")
+        for codePath in codePaths:
+            c=codePath.__name__
+            results2[c]={}
+            for run in range(1,d+1):
+                pRandom=int(run*(p/d))
+                results2[c][pRandom]={"execTime":0,"cpuTime":0,"repetitions":0}
+                for repetition in range(a):
+                    ps = new(codePath.P, num=pRandom)
+                    for pr in ps: setup(pr, (ps-{pr}, r))
+                    startTime=time.time()
+                    startCPUTime=time.process_time()
+                    start(ps)
+                    if await(each(pr in ps, has=received((str(codePath.__name__)+'Done', pr)))):
+                        results2[c][pRandom]["repetitions"]+=1
+                        results2[c][pRandom]["execTime"]+= (time.time() - startTime)
+                        results2[c][pRandom]["cpuTime"]+= (time.process_time() - startCPUTime)
+                    elif timeout(self.timeout):
+                        pass
+                    send((str(codePath.__name__)+'Done',), to=ps)
+        formatResults(results2,"procs")
+
+
+    def run():
+        runCorrectnessTests()               #Correctness Test
+        runPerformanceTests()               #Performance Test  - Fixed processes(n), Varying Requests(r)
+        runPerformanceTests2()              #Performance Test2 -Varying processes(n), Fixed Requests(r)
+        output('terminating')
+        send(('done', self), to= parent())
+        await(received(('done'), from_=parent()))
+
+
+def main():
+
+    p = int(sys.argv[1]) if len(sys.argv) > 1 else 10           # num of proposers
+    a = int(sys.argv[2]) if len(sys.argv) > 2 else 10           # num of acceptors
+    l = int(sys.argv[3]) if len(sys.argv) > 3 else 10           # num of learners
+    n = int(sys.argv[4]) if len(sys.argv) > 4 else 1            # num of runs
+    r = int(sys.argv[5]) if len(sys.argv) > 5 else 0            # message loss rate
+    d = int(sys.argv[6]) if len(sys.argv) > 6 else 1            # message delay
+    w = int(sys.argv[7]) if len(sys.argv) > 7 else 1            # wait time
+    tp = int(sys.argv[8]) if len(sys.argv) > 8 else 1           # timeout by proposers
+    tl = int(sys.argv[9]) if len(sys.argv) > 9 else 1           # timeout by learners
+    driver = new(Driver, num=1)
+    setup(driver,(p,a,l,n,r,d,w,tp,tl))
+    start(driver)
+    await(received(('done', driver)))
+    send(('done'), to=driver)
