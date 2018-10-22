@@ -1,11 +1,14 @@
 import sys
+import time
 from random import randint
 TIMEOUT = 2
+import random
+
+
 class Proposer(process):
-    def setup(acceptors:set):
+    def setup(acceptors:set,r:float,tp:int,w:int,d:int):
         self.n = None                           # proposal number
         self.pnum = None                        # preempted proposed number
-        self.numPreempted = 0                   # Number of preempted values
         self.majority = acceptors               # majority of acceptors; all in other papers
 
 
@@ -18,10 +21,10 @@ class Proposer(process):
         if pnum != None:                                                                  #IF PREEMPTED NUMBER EXISTS
             if pnum[0] > n[0]:                                                            #IF PREEMPTED NUMBER IS GREATER THAN INTERNAL PROPOSAL NUMBER
                 n = (pnum[0]+1, self)                                                     #UPDATE PROPOSAL NUMBER =  preempted number +1
-                self.numPreempted+=1
                 output(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>new n ->",n,pnum,"<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 
-        send(('prepare', n), to= majority)
+        sendMsg(('prepare', n), majority)
+
 
         if await(len(setof(a, received(('respond', _n, _), from_ =a)))
                  > len(acceptors)/2):
@@ -34,54 +37,77 @@ class Proposer(process):
 
             send(('proposed_values', v), to=nodeof(self))                               #COLLECTING ALL PROPOSED VALUES TO TEST CORRECTNESS
 
-            send(('accept', n, v), to= responded)
+            sendMsg(('accept', n, v), responded)
 
 
-        elif timeout(TIMEOUT):
+        elif timeout(tp):
             output('failed proposal number', n)
 
 
     def run():
-        while not received(('done',)):
+        while not received(('Done',)):
+            if w!=0:
+                time.sleep(w)
             to_consent()
         output('terminating')
 
     def receive(msg= ('preempt', n, s)):
-        pnum=s[0]
+        if s != None:
+            pnum = s[0] if pnum != None and s[0][0] > pnum[0] else s[0]
 
     def anyof(s):
         return next(iter(s)) if s else None
+
+    def calcProbMsgLoss():
+        prob = random.uniform(0.0, 1.0)
+        #output("Inside msg loss ", prob)
+        if prob < r:
+            return True
+        else:
+            return False
+
+    def sendMsg(msg, recipients):
+        for to in recipients:
+            if not calcProbMsgLoss():
+                #output("MSGLOSS: Sending", msg, "to", to)
+                time.sleep(d)
+                send(msg, to= to)
+            else:
+                #output("MSGLOSS: Not sending", msg, "to", to)
+                pass
 
 
 
 
 class Acceptor(process):
 
-    def setup(learners:set): pass
+    def setup(learners:set,r:float,d:int): pass
 
 
     def receive(msg= ('prepare', n), from_= p):
         if each(sent(('respond', n2, _)), has= n > n2):
             maxprop = anyof(setof((n, v), sent(('accepted', n, v)),
                                n==max(setof(n, sent(('accepted', n, _))))))
-            send(('respond', n, maxprop), to =p)
+            recipients=[p]
+            sendMsg(('respond', n, maxprop), recipients)
         else :
             maxprop = anyof(setof((n, v), sent(('respond', n, v)),
                                n==max(setof(n, sent(('respond', n, _))))))
-            if maxprop != None :
-                send(('preempt', n, maxprop), to =p)                                #SEND PREEMPTED VALUE IF NOT RESPONDED
+            #if maxprop != None :
+            recipients=[p]
+            sendMsg(('preempt', n, maxprop), recipients)                       #SEND PREEMPTED VALUE IF NOT RESPONDED
 
 
 
 
     def receive(msg= ('accept', n, v)):
         if not some(sent(('respond', n2, _)), has= n2 > n):
-            send(('accepted', n, v), to= learners)
+            sendMsg(('accepted', n, v), learners)
 
 
 
     def run():
-        await(received(('done',)))
+        await(received(('Done',)))
         output('terminating')
 
 
@@ -90,10 +116,29 @@ class Acceptor(process):
         return next(iter(s)) if s else None
 
 
+    def calcProbMsgLoss():
+        prob = random.uniform(0.0, 1.0)
+        #output("Inside msg loss ", prob)
+        if prob < r:
+            return True
+        else:
+            return False
+
+    def sendMsg(msg, recipients):
+        for to in recipients:
+            if not calcProbMsgLoss():
+                #output("MSGLOSS: Sending", msg, "to", to)
+                time.sleep(d)
+                send(msg, to= to)
+            else:
+                #output("MSGLOSS: Not sending", msg, "to", to)
+                pass
+
+
 class Learner(process):
 
-    def setup(acceptors:set):
-        self.accepted_proposal = None
+    def setup(acceptors:set,r:float,tl:int,d:int):
+            self.accepted_proposal = None
 
     def learn():
         if await(some(received(('accepted', n, v)),
@@ -101,14 +146,34 @@ class Learner(process):
                            > len(acceptors)/2)):
             output('learned', n, v)
             accepted_proposal = (n[1],v)
-        elif timeout(TIMEOUT * 10):
+        elif timeout(tl):
             output('failed learning anything')
 
     def run():
         learn()
-        output('terminating')
-        send(('learned', ), to=nodeof(self))
+        output('terminating-preemption3Learned')
+        send(('Learned',self ), to=parent())
+        output('terminating-preemption3Learned1111')
         send(('chosen_proposal', accepted_proposal), to=nodeof(self))
+
+
+    def calcProbMsgLoss():
+        prob = random.uniform(0.0, 1.0)
+        #output("Inside msg loss ", prob)
+        if prob < r:
+            return True
+        else:
+            return False
+
+    def sendMsg(msg, recipients):
+        for to in recipients:
+            if not calcProbMsgLoss():
+                #output("MSGLOSS: Sending", msg, "to", to)
+                time.sleep(d)
+                send(msg, to= to)
+            else:
+                #output("MSGLOSS: Not sending", msg, "to", to)
+                pass
 
 
 def main():
@@ -117,13 +182,14 @@ def main():
     nlearners = int(sys.argv[3]) if len(sys.argv) > 3 else 3
 
     acceptors = new(Acceptor, num= nacceptors)
-    proposers = new(Proposer, (acceptors,), num= nproposers)
-    learners = new(Learner, (acceptors,), num= nlearners)
+    proposers = new(Proposer, (acceptors,0,0,0,0), num= nproposers)
+    learners = new(Learner, (acceptors,0,0,0), num= nlearners)
 
-    for p in acceptors: setup(p, (learners,))
+    for p in acceptors: setup(p, (learners,0,0))
     start(acceptors | proposers | learners)
 
-    await(each(l in learners, has=received(('learned',), from_=l)))
+    await(each(l in learners, has=received(('Learned',l), from_=l)))
+    print("uaua")
     proposed_values_received=set()
     num_preempted=set()
     for proposer in proposers:
@@ -145,12 +211,12 @@ def main():
         if  not k or k[1] not in proposed_values_received:
             correct = False
 
-    output("vv=========<<<<<<<<<<<<<<<<<<",v,countLearners,nlearners,proposed_values_received,num_preempted,"sum numpreempted",sum(num_preempted))
+    output("vv=========<<<<<<<<<<<<<<<<<<",v,countLearners,nlearners,proposed_values_received,num_preempted)
     output("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
     output("CORRECTNESS TEST: ","PASS" if correct else "FAIL")
 
     output('done')
-    send(('done',), to= (acceptors|proposers))
+    send(('Done',), to= (acceptors|proposers))
 
 # This is an executable specification of the algorithm described in
 # Lamport, L. (2001).  Paxos Made Simple.  ACM SIGACT News

@@ -1,16 +1,18 @@
 import sys
+import time
 from random import randint
 TIMEOUT = 1
+import random
 
 class Proposer(process):
-    def setup(acceptors:set,r:float,tp:int):
+    def setup(acceptors:set,r:float,tp:int,w:int,d:int):
         self.n = None              # proposal number
         self.majority = acceptors  # majority of acceptors; all in other papers
 
 
     def to_consent():
         n = (0, self) if n == None else (n[0]+1, self)  # pick a prop num
-        send(('prepare', n), to= majority)
+        sendMsg(('prepare', n), majority)
 
         if await(len(setof(a, received(('respond', _n, _), from_ =a)))
                  > len(acceptors)/2):
@@ -18,43 +20,86 @@ class Proposer(process):
                             n2==max(setof(n2, received(('respond', _n, (n2, _))))))
                       or {randint(1,100)})  # any value, pick in 1..100
             responded = setof(a, received(('respond', _n, _), from_ =a))
-            send(('accept', n, v), to= responded)
-            debug('### chose', n, v)
+            sendMsg(('accept', n, v), responded)
 
         elif timeout(tp):
             output('failed proposal number', n)
 
+
     def run():
-        while not received(('done',)):
+        while not received(('Done',)):
             to_consent()
+            time.sleep(w)
+        output("abhinav----")
         output('terminating')
 
     def anyof(s):
         return next(iter(s)) if s else None
 
+    def calcProbMsgLoss():
+        prob = random.uniform(0.0, 1.0)
+        #output("Inside msg loss ", prob)
+        if prob < r:
+            return True
+        else:
+            return False
+
+    def sendMsg(msg, recipients):
+        for to in recipients:
+            if not calcProbMsgLoss():
+                #output("MSGLOSS: Sending", msg, "to", to)
+                time.sleep(d)
+                send(msg, to= to)
+            else:
+                #output("MSGLOSS: Not sending", msg, "to", to)
+                pass
+
 class Acceptor(process):
-    def setup(learners:set,r:float): pass
+    def setup(learners:set,r:float,d:int): pass
 
     def receive(msg= ('prepare', n), from_= p):
         if each(sent(('respond', n2, _)), has= n > n2):
             maxprop = anyof(setof((n, v), sent(('accepted', n, v)),
                                n==max(setof(n, sent(('accepted', n, _))))))
-            send(('respond', n, maxprop), to =p)
+            recipients=[p]
+            sendMsg(('respond', n, maxprop), recipients)
 
     def receive(msg= ('accept', n, v)):
         if not some(sent(('respond', n2, _)), has= n2 > n):
-            send(('accepted', n, v), to= learners)
+            sendMsg(('accepted', n, v), learners)
 
     def run():
-        await(received(('done',)))
+        await(received(('Done',)))
+        output("djjdjd")
         output('terminating')
 
     def anyof(s):
         """return any element of set s if s is not empty or 'None' otherwise"""
         return next(iter(s)) if s else None
 
+
+    def calcProbMsgLoss():
+        prob = random.uniform(0.0, 1.0)
+        #output("Inside msg loss ", prob)
+        if prob < r:
+            return True
+        else:
+            return False
+
+    def sendMsg(msg, recipients):
+        for to in recipients:
+            if not calcProbMsgLoss():
+                #output("MSGLOSS: Sending", msg, "to", to)
+                time.sleep(d)
+                send(msg, to= to)
+            else:
+                #output("MSGLOSS: Not sending", msg, "to", to)
+                pass
+
+
+
 class Learner(process):
-    def setup(acceptors:set,r:float,tl:int): pass
+    def setup(acceptors:set,r:float,tl:int,d:int): pass
 
     def learn():
         if await(some(received(('accepted', n, v)),
@@ -65,10 +110,30 @@ class Learner(process):
         elif timeout(tl):
             output('failed learning anything')
 
+    def calcProbMsgLoss():
+        prob = random.uniform(0.0, 1.0)
+        #output("Inside msg loss ", prob)
+        if prob < r:
+            return True
+        else:
+            return False
+
+    def sendMsg(msg, recipients):
+        for to in recipients:
+            if not calcProbMsgLoss():
+                #output("MSGLOSS: Sending", msg, "to", to)
+                time.sleep(d)
+                send(msg, to= to)
+            else:
+                #output("MSGLOSS: Not sending", msg, "to", to)
+                pass
+
     def run():
         learn()
         output('terminating')
-        send(('learned', ), to=nodeof(self))
+        #send(('Done', ), to=nodeof(self))
+        send(('Learned',self), to=parent())
+
 
 def main():
     nacceptors = int(sys.argv[1]) if len(sys.argv) > 1 else 3
@@ -84,9 +149,9 @@ def main():
     for p in acceptors: setup(p, (learners,r))
     start(acceptors | proposers | learners)
 
-    await(each(l in learners, has=received(('learned',), from_=l)))
+    await(each(l in learners, has=received(('Learned',), from_=l)))
     output('done')
-    send(('done',), to= (acceptors|proposers))
+    send(('Done',), to= (acceptors|proposers))
 
 # This is an executable specification of the algorithm described in
 # Lamport, L. (2001).  Paxos Made Simple.  ACM SIGACT News

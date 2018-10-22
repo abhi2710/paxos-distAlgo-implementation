@@ -7,45 +7,55 @@ codePaths=[orig3,preemption3]
 
 class Driver(process):
     def setup(p,a,l,n,r,d,w,tp,tl):
-        self.p=p
-        self.a=a
-        self.l=l
-        self.n=n
-        self.r=r
-        self.d=d
-        self.w=w
-        self.tp=tp
-        self.tl=tl
+        pass
 
 
     def runPerformanceTests():
-
+        acceptors={}
+        proposers={}
+        learners={}
         for codePath in codePaths:
+            output("====================================================================================")
+            output("=============================",str(codePath.__name__),"===============================")
+            output("==================================================================================")
+            acceptors[str(codePath.__name__)]={}
+            proposers[str(codePath.__name__)]={}
+            learners[str(codePath.__name__)]={}
             for run in range(n):
+                acceptors[str(codePath.__name__)][run]=[]
+                proposers[str(codePath.__name__)][run]=[]
+                learners[str(codePath.__name__)][run]=[]
+                output("**********************************************************************************")
+                output("******************************",str(codePath.__name__)," Run: ",run+1,"************************************")
+                output("**********************************************************************************")
 
-                acceptors = new(codePath.Acceptor, num= a)
-                proposers = new(codePath.Proposer, (acceptors,r,tp), num= p)
-                learners = new(codePath.Learner, (acceptors,r,tl), num= l)
-                for p in acceptors: setup(p, (learners,r))
-                start(acceptors | proposers | learners)
+                acceptors[str(codePath.__name__)][run] = new(codePath.Acceptor, num= a)
+                proposers[str(codePath.__name__)][run] = new(codePath.Proposer, (acceptors[str(codePath.__name__)][run],tp,w,r,d), num= p)
+                learners[str(codePath.__name__)][run] = new(codePath.Learner, (acceptors[str(codePath.__name__)][run],tl,r,d), num= l)
+
+                for p in acceptors[str(codePath.__name__)][run]: setup(p, (learners[str(codePath.__name__)][run],r,d))
+                start(acceptors[str(codePath.__name__)][run] | proposers[str(codePath.__name__)][run] | learners[str(codePath.__name__)][run])
+
+
+                await(each(learner in learners[str(codePath.__name__)][run], has=received(('Learned', learner), from_=learner)))
+                send( ('Done',), to= (acceptors[str(codePath.__name__)][run]  | proposers[str(codePath.__name__)][run])  )
 
 
 
     def run():
-
         runPerformanceTests()               #Performance Test
         output('terminating')
         send(('done', self), to= parent())
+        output("Sending done to parent")
         await(received(('done'), from_=parent()))
 
 
 def main():
-
     p = int(sys.argv[1]) if len(sys.argv) > 1 else 10           # num of proposers
     a = int(sys.argv[2]) if len(sys.argv) > 2 else 10           # num of acceptors
     l = int(sys.argv[3]) if len(sys.argv) > 3 else 10           # num of learners
     n = int(sys.argv[4]) if len(sys.argv) > 4 else 1            # num of runs
-    r = float(sys.argv[5]) if len(sys.argv) > 5 else 0            # message loss rate
+    r = float(sys.argv[5]) if len(sys.argv) > 5 else 0.0            # message loss rate
     d = int(sys.argv[6]) if len(sys.argv) > 6 else 1            # message delay
     w = int(sys.argv[7]) if len(sys.argv) > 7 else 1            # wait time
     tp = int(sys.argv[8]) if len(sys.argv) > 8 else 1           # timeout by proposers
@@ -53,5 +63,6 @@ def main():
     driver = new(Driver, num=1)
     setup(driver,(p,a,l,n,r,d,w,tp,tl))
     start(driver)
-    await(received(('done', driver)))
+    await(each(e in driver, has=received(('done', e))))
+
     send(('done'), to=driver)
