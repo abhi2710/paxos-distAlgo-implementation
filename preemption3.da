@@ -1,6 +1,5 @@
 import sys
 from random import randint
-TIMEOUT = 2
 import time
 import random
 
@@ -35,7 +34,8 @@ class Proposer(process):
 
 
         elif timeout(tp):
-            output('TP', tp, 'failed proposal number', n)
+            pass
+            #output('TP', tp, 'failed proposal number', n)
 
     def msgLoss():
         ran = random.uniform(0.0, 1.0)
@@ -57,7 +57,6 @@ class Proposer(process):
             if w != 0:
                 time.sleep(w)
             to_consent()
-        output('terminating proposer--------------')
 
 
 
@@ -92,7 +91,7 @@ class Acceptor(process):
 
     def run():
         await(received(('Done',)))
-        output('terminating acceptor===================', self)
+        #output('terminating acceptor===================', self)
 
     def anyof(s):
         """return any element of set s if s is not empty or 'None' otherwise"""
@@ -121,15 +120,16 @@ class Learner(process):
         if await(some(received(('accepted', n, v)),
                       has= len(setof(a, received(('accepted', _n, _v), from_=a)))
                            > len(acceptors)/2)):
-            output('learned', n, v)
+            #output('learned', n, v)
             accepted_proposal = (n[1],v)
 
         elif timeout(tl):
-            output("TL", tl, 'failed learning anything')
+            #output("TL", tl, 'failed learning anything')
+            pass
 
     def run():
         learn()
-        output('terminating learner+++++++++++++++++', self)
+        #output('terminating learner+++++++++++++++++', self)
         send(('learned', ), to=nodeof(self))
         send(('learned_proposal', accepted_proposal), to=nodeof(self))
         send(('Learned', self), to=parent())
@@ -147,7 +147,7 @@ def main():
 
     await(each(l in learners, has=received(('learned',), from_=l)))
 
-    output('done')
+    #output('done')
     send(('Done',), to= (acceptors|proposers))
 
     # Set for storing learned values
@@ -168,7 +168,7 @@ def main():
     if correct == True and next(iter(learned_value)) == None:
         correct = False
 
-    output("$$$$$$$$$$$$$$", learned_value)
+    #output("$$$$$$$$$$$$$$", learned_value)
 
     # Checking if only one of the proposed value is learned and not any anything else
     if correct:

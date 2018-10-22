@@ -3,11 +3,12 @@ import random
 import time
 import orig3
 import preemption3
-codePaths=[orig3,preemption3]
+codePaths=[preemption3,orig3]
 
 class Driver(process):
     def setup(p,a,l,n,r,d,w,tp,tl):
-        pass
+        self.results={}
+
 
 
     def runPerformanceTests():
@@ -15,30 +16,43 @@ class Driver(process):
         proposers={}
         learners={}
         for codePath in codePaths:
-            output("====================================================================================")
-            output("=============================",str(codePath.__name__),"===============================")
-            output("==================================================================================")
-            acceptors[str(codePath.__name__)]={}
-            proposers[str(codePath.__name__)]={}
-            learners[str(codePath.__name__)]={}
-            for run in range(n):
-                acceptors[str(codePath.__name__)][run]=[]
-                proposers[str(codePath.__name__)][run]=[]
-                learners[str(codePath.__name__)][run]=[]
-                output("**********************************************************************************")
-                output("******************************",str(codePath.__name__)," Run: ",run+1,"************************************")
-                output("**********************************************************************************")
+            c=str(codePath.__name__)
+            results[c]={}
+            #output("====================================================================================")
+            #output("=============================",str(codePath.__name__),"===============================")
+            #output("==================================================================================")
+            acceptors[c]={}
+            proposers[c]={}
+            learners[c]={}
+            rVals=[0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+            #rVals=[0.0,0.1]
+            for rVary in rVals:
+                results[c][rVary]={"execTime":0,"cpuTime":0,"n":n}
+                for run in range(n):
+                    acceptors[c][run]=[]
+                    proposers[c][run]=[]
+                    learners[c][run]=[]
+                    #output("**********************************************************************************")
+                    #output("******************************",str(codePath.__name__)," Run: ",run+1,"************************************")
+                    #output("**********************************************************************************")
+                    startTime=time.time()
+                    startCPUTime=time.process_time()
 
-                acceptors[str(codePath.__name__)][run] = new(codePath.Acceptor, num= a)
-                proposers[str(codePath.__name__)][run] = new(codePath.Proposer, (acceptors[str(codePath.__name__)][run],tp,w,r,d), num= p)
-                learners[str(codePath.__name__)][run] = new(codePath.Learner, (acceptors[str(codePath.__name__)][run],tl,r,d), num= l)
+                    acceptors[c][run] = new(codePath.Acceptor, num= a)
+                    proposers[c][run] = new(codePath.Proposer, (acceptors[c][run],tp,w,rVary,d), num= p)
+                    learners[c][run] = new(codePath.Learner, (acceptors[c][run],tl,rVary,d), num= l)
 
-                for p in acceptors[str(codePath.__name__)][run]: setup(p, (learners[str(codePath.__name__)][run],r,d))
-                start(acceptors[str(codePath.__name__)][run] | proposers[str(codePath.__name__)][run] | learners[str(codePath.__name__)][run])
+                    for p in acceptors[c][run]: setup(p, (learners[c][run],rVary,d))
 
 
-                await(each(learner in learners[str(codePath.__name__)][run], has=received(('Learned', learner), from_=learner)))
-                send( ('Done',), to= (acceptors[str(codePath.__name__)][run]  | proposers[str(codePath.__name__)][run])  )
+                    start(acceptors[c][run] | proposers[c][run] | learners[c][run])
+
+
+                    await(each(learner in learners[c][run], has=received(('Learned', learner), from_=learner)))
+                    send( ('Done',), to= (acceptors[c][run]  | proposers[c][run])  )
+                    results[c][rVary]["execTime"]+= (time.time() - startTime)
+                    results[c][rVary]["cpuTime"]+= (time.process_time() - startCPUTime)
+        print("results",results)
 
 
 

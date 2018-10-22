@@ -1,7 +1,6 @@
 import sys
 import time
 from random import randint
-TIMEOUT = 1
 import random
 
 class Proposer(process):
@@ -23,15 +22,16 @@ class Proposer(process):
             sendMsg(('accept', n, v), responded)
 
         elif timeout(tp):
-            output('failed proposal number', n)
+            #output('failed proposal number', n)
+            pass
 
 
     def run():
         while not received(('Done',)):
             to_consent()
             time.sleep(w)
-        output("abhinav----")
-        output('terminating')
+        #output("abhinav----")
+        #output('terminating')
 
     def anyof(s):
         return next(iter(s)) if s else None
@@ -70,8 +70,8 @@ class Acceptor(process):
 
     def run():
         await(received(('Done',)))
-        output("djjdjd")
-        output('terminating')
+        #output("djjdjd")
+        #output('terminating')
 
     def anyof(s):
         """return any element of set s if s is not empty or 'None' otherwise"""
@@ -105,10 +105,12 @@ class Learner(process):
         if await(some(received(('accepted', n, v)),
                       has= len(setof(a, received(('accepted', _n, _v), from_=a)))
                            > len(acceptors)/2)):
-            output('learned', n, v)
+            pass
+            #output('learned', n, v)
 
         elif timeout(tl):
-            output('failed learning anything')
+            #output('failed learning anything')
+            pass
 
     def calcProbMsgLoss():
         prob = random.uniform(0.0, 1.0)
@@ -130,7 +132,7 @@ class Learner(process):
 
     def run():
         learn()
-        output('terminating')
+        #output('terminating')
         #send(('Done', ), to=nodeof(self))
         send(('Learned',self), to=parent())
 
