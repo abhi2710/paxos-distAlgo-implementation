@@ -3,12 +3,257 @@ import random
 import time
 import orig3
 import preemption3
-codePaths=[preemption3,orig3]
+codePaths=[orig3]
 
 class Driver(process):
     def setup(p,a,l,n,r,d,w,tp,tl):
         self.results={}
 
+
+    def formatResults(results,varyingFunc):
+
+        output("************************************************************************************")
+        output("********************************Average CPU Time************************************")
+        output("************************************************************************************")
+        output( "{:<10} | {:<20} | {:<10} ".format(varyingFunc,'orig3.da','preemption3.da'))
+        for i in results['orig3']:
+            output( "{:<10} | {:<20} | {:<10} ".format(i,
+            round(results['orig3'][i]['cpuTime']/results['orig3'][i]['n'],4) if results['orig3'][i]['n'] > 0 else "Failed",
+            round(results['preemption3'][i]['cpuTime']/results['preemption3'][i]['n'],4) if results['preemption3'][i]['n'] > 0 else "Failed"
+            ))
+        output('\n')
+        output("************************************************************************************")
+        output("********************************Average Elapsed Time********************************")
+        output("************************************************************************************")
+        output( "{:<10} | {:<20} | {:<10} ".format(varyingFunc,'orig3.da','preemption3.da'))
+        for i in results['orig3']:
+            output( "{:<10} | {:<20} | {:<10} ".format(i,
+            round(results['orig3'][i]['execTime']/results['orig3'][i]['n'],4) if results['orig3'][i]['n'] > 0 else "Failed",
+            round(results['preemption3'][i]['execTime']/results['preemption3'][i]['n'],4) if results['preemption3'][i]['n'] > 0 else "Failed"
+            ))
+
+    def runPerformanceTestsVaryingTL():
+        acceptors={}
+        proposers={}
+        learners={}
+        for codePath in codePaths:
+            c=str(codePath.__name__)
+            results[c]={}
+            #output("====================================================================================")
+            #output("=============================",str(codePath.__name__),"===============================")
+            #output("==================================================================================")
+            acceptors[c]={}
+            proposers[c]={}
+            learners[c]={}
+            tlVals=[1,3,5,7,10]
+            for tlVary in tlVals:
+                results[c][tlVary]={"execTime":0,"cpuTime":0,"n":n}
+                for run in range(n):
+                    acceptors[c][run]=[]
+                    proposers[c][run]=[]
+                    learners[c][run]=[]
+                    #output("**********************************************************************************")
+                    #output("******************************",str(codePath.__name__)," Run: ",run+1,"************************************")
+                    #output("**********************************************************************************")
+                    startTime=time.time()
+                    startCPUTime=time.process_time()
+
+                    acceptors[c][run] = new(codePath.Acceptor, num= a)
+                    proposers[c][run] = new(codePath.Proposer, (acceptors[c][run],tp,w,r,d), num= p)
+                    learners[c][run] = new(codePath.Learner, (acceptors[c][run],tlVary,r,d), num= l)
+
+                    for p in acceptors[c][run]: setup(p, (learners[c][run],r,d))
+
+
+                    start(acceptors[c][run] | proposers[c][run] | learners[c][run])
+
+
+                    await(each(learner in learners[c][run], has=received(('Learned', learner), from_=learner)))
+                    send( ('Done',), to= (acceptors[c][run]  | proposers[c][run])  )
+                    results[c][tlVary]["execTime"]+= (time.time() - startTime)
+                    results[c][tlVary]["cpuTime"]+= (time.process_time() - startCPUTime)
+        print("tlVary",results)
+        formatResults(results,"Varying tl")
+
+
+    def runPerformanceTestsVaryingTP():
+        acceptors={}
+        proposers={}
+        learners={}
+        for codePath in codePaths:
+            c=str(codePath.__name__)
+            results[c]={}
+            #output("====================================================================================")
+            #output("=============================",str(codePath.__name__),"===============================")
+            #output("==================================================================================")
+            acceptors[c]={}
+            proposers[c]={}
+            learners[c]={}
+            tpVals=[1,3,5,7,10]
+            for tpVary in tpVals:
+                results[c][tpVary]={"execTime":0,"cpuTime":0,"n":n}
+                for run in range(n):
+                    acceptors[c][run]=[]
+                    proposers[c][run]=[]
+                    learners[c][run]=[]
+                    #output("**********************************************************************************")
+                    #output("******************************",str(codePath.__name__)," Run: ",run+1,"************************************")
+                    #output("**********************************************************************************")
+                    startTime=time.time()
+                    startCPUTime=time.process_time()
+
+                    acceptors[c][run] = new(codePath.Acceptor, num= a)
+                    proposers[c][run] = new(codePath.Proposer, (acceptors[c][run],tpVary,w,r,d), num= p)
+                    learners[c][run] = new(codePath.Learner, (acceptors[c][run],tl,r,d), num= l)
+
+                    for p in acceptors[c][run]: setup(p, (learners[c][run],r,d))
+
+
+                    start(acceptors[c][run] | proposers[c][run] | learners[c][run])
+
+
+                    await(each(learner in learners[c][run], has=received(('Learned', learner), from_=learner)))
+                    send( ('Done',), to= (acceptors[c][run]  | proposers[c][run])  )
+                    results[c][tpVary]["execTime"]+= (time.time() - startTime)
+                    results[c][tpVary]["cpuTime"]+= (time.process_time() - startCPUTime)
+        print("tpVary",results)
+        formatResults(results,"Varying tp")
+
+    def runPerformanceTestsVaryingD():
+        acceptors={}
+        proposers={}
+        learners={}
+        for codePath in codePaths:
+            c=str(codePath.__name__)
+            results[c]={}
+            #output("====================================================================================")
+            #output("=============================",str(codePath.__name__),"===============================")
+            #output("==================================================================================")
+            acceptors[c]={}
+            proposers[c]={}
+            learners[c]={}
+            dVals=[1,3,5,7,10]
+            for dVary in dVals:
+                results[c][dVary]={"execTime":0,"cpuTime":0,"n":n}
+                for run in range(n):
+                    acceptors[c][run]=[]
+                    proposers[c][run]=[]
+                    learners[c][run]=[]
+                    #output("**********************************************************************************")
+                    #output("******************************",str(codePath.__name__)," Run: ",run+1,"************************************")
+                    #output("**********************************************************************************")
+                    startTime=time.time()
+                    startCPUTime=time.process_time()
+
+                    acceptors[c][run] = new(codePath.Acceptor, num= a)
+                    proposers[c][run] = new(codePath.Proposer, (acceptors[c][run],tp,w,r,dVary), num= p)
+                    learners[c][run] = new(codePath.Learner, (acceptors[c][run],tl,r,dVary), num= l)
+
+                    for p in acceptors[c][run]: setup(p, (learners[c][run],r,dVary))
+
+
+                    start(acceptors[c][run] | proposers[c][run] | learners[c][run])
+
+
+                    await(each(learner in learners[c][run], has=received(('Learned', learner), from_=learner)))
+                    send( ('Done',), to= (acceptors[c][run]  | proposers[c][run])  )
+                    results[c][dVary]["execTime"]+= (time.time() - startTime)
+                    results[c][dVary]["cpuTime"]+= (time.process_time() - startCPUTime)
+        print("wVary",results)
+        formatResults(results,"Varying d")
+
+
+    def runPerformanceTestsVaryingW():
+        acceptors={}
+        proposers={}
+        learners={}
+        for codePath in codePaths:
+            c=str(codePath.__name__)
+            results[c]={}
+            #output("====================================================================================")
+            #output("=============================",str(codePath.__name__),"===============================")
+            #output("==================================================================================")
+            acceptors[c]={}
+            proposers[c]={}
+            learners[c]={}
+            wVals=[1,3,5,7,10]
+            for wVary in wVals:
+                results[c][wVary]={"execTime":0,"cpuTime":0,"n":n}
+                for run in range(n):
+                    acceptors[c][run]=[]
+                    proposers[c][run]=[]
+                    learners[c][run]=[]
+                    #output("**********************************************************************************")
+                    #output("******************************",str(codePath.__name__)," Run: ",run+1,"************************************")
+                    #output("**********************************************************************************")
+                    startTime=time.time()
+                    startCPUTime=time.process_time()
+
+                    acceptors[c][run] = new(codePath.Acceptor, num= a)
+                    proposers[c][run] = new(codePath.Proposer, (acceptors[c][run],tp,wVary,r,d), num= p)
+                    learners[c][run] = new(codePath.Learner, (acceptors[c][run],tl,r,d), num= l)
+
+                    for p in acceptors[c][run]: setup(p, (learners[c][run],r,d))
+
+
+                    start(acceptors[c][run] | proposers[c][run] | learners[c][run])
+
+
+                    await(each(learner in learners[c][run], has=received(('Learned', learner), from_=learner)))
+                    send( ('Done',), to= (acceptors[c][run]  | proposers[c][run])  )
+                    results[c][wVary]["execTime"]+= (time.time() - startTime)
+                    results[c][wVary]["cpuTime"]+= (time.process_time() - startCPUTime)
+        print("wVary",results)
+        formatResults(results,"Varying w")
+
+
+
+
+    def runPerformanceTestsVaryingR():
+        acceptors={}
+        proposers={}
+        learners={}
+        for codePath in codePaths:
+            c=str(codePath.__name__)
+            results[c]={}
+            #output("====================================================================================")
+            #output("=============================",str(codePath.__name__),"===============================")
+            #output("==================================================================================")
+            acceptors[c]={}
+            proposers[c]={}
+            learners[c]={}
+            rVals=[0.0,0.2,0.4,0.6,0.8,1.0]
+            for rVary in rVals:
+                results[c][rVary]={"execTime":0,"cpuTime":0,"n":n}
+                for run in range(n):
+                    acceptors[c][run]=[]
+                    proposers[c][run]=[]
+                    learners[c][run]=[]
+                    #output("**********************************************************************************")
+                    #output("******************************",str(codePath.__name__)," Run: ",run+1,"************************************")
+                    #output("**********************************************************************************")
+                    startTime=time.time()
+                    startCPUTime=time.process_time()
+
+                    acceptors[c][run] = new(codePath.Acceptor, num= a)
+                    proposers[c][run] = new(codePath.Proposer, (acceptors[c][run],tp,w,rVary,d), num= p)
+                    learners[c][run] = new(codePath.Learner, (acceptors[c][run],tl,rVary,d), num= l)
+
+                    for p in acceptors[c][run]: setup(p, (learners[c][run],rVary,d))
+
+
+                    start(acceptors[c][run] | proposers[c][run] | learners[c][run])
+                    print("here")
+                    await(each(learner in learners[c][run], has=received(('Learned', learner,a2), from_=learner)))
+                    print("there")
+                    hasLearnedSet=(setof(a, received(('Learned', b , True)),))
+                    print(hasLearnedSet)
+
+                    send( ('Done',), to= (acceptors[c][run]  | proposers[c][run])  )
+                    results[c][rVary]["execTime"]+= (time.time() - startTime)
+                    results[c][rVary]["cpuTime"]+= (time.process_time() - startCPUTime)
+        print("results r varying: ",results)
+        formatResults(results,"Varying r")
 
 
     def runPerformanceTests():
@@ -24,8 +269,7 @@ class Driver(process):
             acceptors[c]={}
             proposers[c]={}
             learners[c]={}
-            rVals=[0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
-            #rVals=[0.0,0.1]
+            rVals=[r]
             for rVary in rVals:
                 results[c][rVary]={"execTime":0,"cpuTime":0,"n":n}
                 for run in range(n):
@@ -52,12 +296,17 @@ class Driver(process):
                     send( ('Done',), to= (acceptors[c][run]  | proposers[c][run])  )
                     results[c][rVary]["execTime"]+= (time.time() - startTime)
                     results[c][rVary]["cpuTime"]+= (time.process_time() - startCPUTime)
-        print("results",results)
-
+        print("results r varying: ",results)
+        formatResults(results,"Fixed Input")
 
 
     def run():
-        runPerformanceTests()               #Performance Test
+        runPerformanceTestsVaryingR()
+        #runPerformanceTestsVaryingW()
+        #runPerformanceTestsVaryingD()
+        #runPerformanceTestsVaryingTP()
+        #runPerformanceTestsVaryingTL()
+        #runPerformanceTests()
         output('terminating')
         send(('done', self), to= parent())
         output("Sending done to parent")

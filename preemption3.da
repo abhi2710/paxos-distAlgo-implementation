@@ -120,11 +120,11 @@ class Learner(process):
         if await(some(received(('accepted', n, v)),
                       has= len(setof(a, received(('accepted', _n, _v), from_=a)))
                            > len(acceptors)/2)):
-            #output('learned', n, v)
+            output('learned', n, v)
             accepted_proposal = (n[1],v)
 
         elif timeout(tl):
-            #output("TL", tl, 'failed learning anything')
+            output("TL", tl, 'failed learning anything')
             pass
 
     def run():

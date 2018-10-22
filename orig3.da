@@ -99,18 +99,18 @@ class Acceptor(process):
 
 
 class Learner(process):
-    def setup(acceptors:set,r:float,tl:int,d:int): pass
+    def setup(acceptors:set,r:float,tl:int,d:int):
+        self.hasLearned=False
 
     def learn():
         if await(some(received(('accepted', n, v)),
                       has= len(setof(a, received(('accepted', _n, _v), from_=a)))
                            > len(acceptors)/2)):
-            pass
-            #output('learned', n, v)
+            hasLearned=True
+            output('learned', n, v)
 
         elif timeout(tl):
-            #output('failed learning anything')
-            pass
+            output('failed learning anything')
 
     def calcProbMsgLoss():
         prob = random.uniform(0.0, 1.0)
@@ -134,7 +134,7 @@ class Learner(process):
         learn()
         #output('terminating')
         #send(('Done', ), to=nodeof(self))
-        send(('Learned',self), to=parent())
+        send(('Learned',self,hasLearned), to=parent())
 
 
 def main():
