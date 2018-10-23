@@ -22,14 +22,17 @@ class Proposer(process):
             sendMsg(('accept', n, v), responded)
 
         elif timeout(tp):
-            #output('failed proposal number', n)
+            output('failed proposal number', n)
             pass
 
 
     def run():
         while not received(('Done',)):
             to_consent()
-            time.sleep(w)
+            if await(False):
+                pass
+            elif(timeout(w)):
+                pass
         #output("abhinav----")
         #output('terminating')
 
@@ -38,7 +41,7 @@ class Proposer(process):
 
     def calcProbMsgLoss():
         prob = random.uniform(0.0, 1.0)
-        #output("Inside msg loss ", prob)
+        #output("Inside msg loss ", prob,r)
         if prob < r:
             return True
         else:
@@ -48,7 +51,10 @@ class Proposer(process):
         for to in recipients:
             if not calcProbMsgLoss():
                 #output("MSGLOSS: Sending", msg, "to", to)
-                time.sleep(d)
+                if await(False):
+                    pass
+                elif(timeout(d)):
+                    pass
                 send(msg, to= to)
             else:
                 #output("MSGLOSS: Not sending", msg, "to", to)
@@ -90,7 +96,10 @@ class Acceptor(process):
         for to in recipients:
             if not calcProbMsgLoss():
                 #output("MSGLOSS: Sending", msg, "to", to)
-                time.sleep(d)
+                if await(False):
+                    pass
+                elif(timeout(d)):
+                    pass
                 send(msg, to= to)
             else:
                 #output("MSGLOSS: Not sending", msg, "to", to)
@@ -124,7 +133,10 @@ class Learner(process):
         for to in recipients:
             if not calcProbMsgLoss():
                 #output("MSGLOSS: Sending", msg, "to", to)
-                time.sleep(d)
+                if await(False):
+                    pass
+                elif(timeout(d)):
+                    pass
                 send(msg, to= to)
             else:
                 #output("MSGLOSS: Not sending", msg, "to", to)
